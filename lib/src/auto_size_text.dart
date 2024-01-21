@@ -11,8 +11,7 @@ class AutoSizeText extends StatefulWidget {
   ///
   /// If the [style] argument is null, the text will use the style from the
   /// closest enclosing [DefaultTextStyle].
-  const AutoSizeText(
-    String this.data, {
+  const AutoSizeText(String this.data, {
     Key? key,
     this.textKey,
     this.style,
@@ -32,12 +31,13 @@ class AutoSizeText extends StatefulWidget {
     this.textScaleFactor,
     this.maxLines,
     this.semanticsLabel,
-  })  : textSpan = null,
+    this.textBuilder,
+  })
+      : textSpan = null,
         super(key: key);
 
   /// Creates a [AutoSizeText] widget with a [TextSpan].
-  const AutoSizeText.rich(
-    TextSpan this.textSpan, {
+  const AutoSizeText.rich(TextSpan this.textSpan, {
     Key? key,
     this.textKey,
     this.style,
@@ -57,7 +57,9 @@ class AutoSizeText extends StatefulWidget {
     this.textScaleFactor,
     this.maxLines,
     this.semanticsLabel,
-  })  : data = null,
+    this.textBuilder,
+  })
+      : data = null,
         super(key: key);
 
   /// Sets the key for the resulting [Text] widget.
@@ -215,6 +217,12 @@ class AutoSizeText extends StatefulWidget {
   /// ```
   final String? semanticsLabel;
 
+  /// Allows usage of a custom Text widget
+  ///
+  /// The builder is passed the font size, text style and maxLines and can return any Widget
+  final Widget Function(String data, TextStyle style, int? maxLines)?
+  textBuilder;
+
   @override
   _AutoSizeTextState createState() => _AutoSizeTextState();
 }
@@ -277,36 +285,36 @@ class _AutoSizeTextState extends State<AutoSizeText> {
 
   void _validateProperties(TextStyle style, int? maxLines) {
     assert(widget.overflow == null || widget.overflowReplacement == null,
-        'Either overflow or overflowReplacement must be null.');
+    'Either overflow or overflowReplacement must be null.');
     assert(maxLines == null || maxLines > 0,
-        'MaxLines must be greater than or equal to 1.');
+    'MaxLines must be greater than or equal to 1.');
     assert(widget.key == null || widget.key != widget.textKey,
-        'Key and textKey must not be equal.');
+    'Key and textKey must not be equal.');
 
     if (widget.presetFontSizes == null) {
       assert(
-          widget.stepGranularity >= 0.1,
-          'StepGranularity must be greater than or equal to 0.1. It is not a '
+      widget.stepGranularity >= 0.1,
+      'StepGranularity must be greater than or equal to 0.1. It is not a '
           'good idea to resize the font with a higher accuracy.');
       assert(widget.minFontSize >= 0,
-          'MinFontSize must be greater than or equal to 0.');
+      'MinFontSize must be greater than or equal to 0.');
       assert(widget.maxFontSize > 0, 'MaxFontSize has to be greater than 0.');
       assert(widget.minFontSize <= widget.maxFontSize,
-          'MinFontSize must be smaller or equal than maxFontSize.');
+      'MinFontSize must be smaller or equal than maxFontSize.');
       assert(widget.minFontSize / widget.stepGranularity % 1 == 0,
-          'MinFontSize must be a multiple of stepGranularity.');
+      'MinFontSize must be a multiple of stepGranularity.');
       if (widget.maxFontSize != double.infinity) {
         assert(widget.maxFontSize / widget.stepGranularity % 1 == 0,
-            'MaxFontSize must be a multiple of stepGranularity.');
+        'MaxFontSize must be a multiple of stepGranularity.');
       }
     } else {
       assert(widget.presetFontSizes!.isNotEmpty,
-          'PresetFontSizes must not be empty.');
+      'PresetFontSizes must not be empty.');
     }
   }
 
-  List _calculateFontSize(
-      BoxConstraints size, TextStyle? style, int? maxLines) {
+  List _calculateFontSize(BoxConstraints size, TextStyle? style,
+      int? maxLines) {
     final span = TextSpan(
       style: widget.textSpan?.style ?? style,
       text: widget.textSpan?.text ?? widget.data,
@@ -323,7 +331,7 @@ class _AutoSizeTextState extends State<AutoSizeText> {
     final presetFontSizes = widget.presetFontSizes?.reversed.toList();
     if (presetFontSizes == null) {
       final num defaultFontSize =
-          style!.fontSize!.clamp(widget.minFontSize, widget.maxFontSize);
+      style!.fontSize!.clamp(widget.minFontSize, widget.maxFontSize);
       final defaultScale = defaultFontSize * userScale / style.fontSize!;
       if (_checkTextFits(span, defaultScale, maxLines, size)) {
         return <Object>[defaultFontSize * userScale, true];
@@ -367,8 +375,8 @@ class _AutoSizeTextState extends State<AutoSizeText> {
     return <Object>[fontSize, lastValueFits];
   }
 
-  bool _checkTextFits(
-      TextSpan text, double scale, int? maxLines, BoxConstraints constraints) {
+  bool _checkTextFits(TextSpan text, double scale, int? maxLines,
+      BoxConstraints constraints) {
     if (!widget.wrapWords) {
       final words = text.toPlainText().split(RegExp('\\s+'));
 
@@ -411,48 +419,51 @@ class _AutoSizeTextState extends State<AutoSizeText> {
   }
 
   Widget _buildText(double fontSize, TextStyle style, int? maxLines) {
-    if (widget.data != null) {
-      return Text(
-        widget.data!,
-        key: widget.textKey,
-        style: style.copyWith(fontSize: fontSize),
-        strutStyle: widget.strutStyle,
-        textAlign: widget.textAlign,
-        textDirection: widget.textDirection,
-        locale: widget.locale,
-        softWrap: widget.softWrap,
-        overflow: widget.overflow,
-        textScaleFactor: 1,
-        maxLines: maxLines,
-        semanticsLabel: widget.semanticsLabel,
-      );
-    } else {
-      return Text.rich(
-        widget.textSpan!,
-        key: widget.textKey,
-        style: style,
-        strutStyle: widget.strutStyle,
-        textAlign: widget.textAlign,
-        textDirection: widget.textDirection,
-        locale: widget.locale,
-        softWrap: widget.softWrap,
-        overflow: widget.overflow,
-        textScaleFactor: fontSize / style.fontSize!,
-        maxLines: maxLines,
-        semanticsLabel: widget.semanticsLabel,
-      );
+    if (widget.textBuilder != null) {
+      return widget.textBuilder!(
+          widget.data!, style.copyWith(fontSize: fontSize), maxLines);
+      if (widget.data != null) {
+        return Text(
+          widget.data!,
+          key: widget.textKey,
+          style: style.copyWith(fontSize: fontSize),
+          strutStyle: widget.strutStyle,
+          textAlign: widget.textAlign,
+          textDirection: widget.textDirection,
+          locale: widget.locale,
+          softWrap: widget.softWrap,
+          overflow: widget.overflow,
+          textScaleFactor: 1,
+          maxLines: maxLines,
+          semanticsLabel: widget.semanticsLabel,
+        );
+      } else {
+        return Text.rich(
+          widget.textSpan!,
+          key: widget.textKey,
+          style: style,
+          strutStyle: widget.strutStyle,
+          textAlign: widget.textAlign,
+          textDirection: widget.textDirection,
+          locale: widget.locale,
+          softWrap: widget.softWrap,
+          overflow: widget.overflow,
+          textScaleFactor: fontSize / style.fontSize!,
+          maxLines: maxLines,
+          semanticsLabel: widget.semanticsLabel,
+        );
+      }
+    }
+
+    void _notifySync() {
+      setState(() {});
+    }
+
+    @override
+    void dispose() {
+      if (widget.group != null) {
+        widget.group!._remove(this);
+      }
+      super.dispose();
     }
   }
-
-  void _notifySync() {
-    setState(() {});
-  }
-
-  @override
-  void dispose() {
-    if (widget.group != null) {
-      widget.group!._remove(this);
-    }
-    super.dispose();
-  }
-}
